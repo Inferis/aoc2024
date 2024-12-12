@@ -7,9 +7,15 @@ guard let input = try? String(contentsOf:URL(filePath: "smallinput.txt"), encodi
     exit(0)
 }
 
-struct Position: Equatable {
+struct Position: Equatable, CustomStringConvertible {
     let x: Int
     let y: Int
+
+    var description: String {
+        get {
+            "(\(x), \(y))"
+        }
+    }
 }
 
 func ==(a: Position, b: Position) -> Bool {
@@ -58,15 +64,15 @@ func print(map: [[String]]) {
 struct Traversal {
     let exited: Bool
     let map: [[String]]
-    let crossings: [Position]
+    let visited: [Position]
 }
 
-func traverse(map freshMap: [[String]]) -> Traversal {
-    var crossings: [Position] = []
+func traverse(map freshMap: [[String]]) -> Traversal? {
     var map = freshMap
     let startPosition = positionOfGuard(on: map)
+    var visited: [Position] = []
     if var position = startPosition {
-        let startDirection =  directionOf(guard: map[position.y][position.x])
+        let startDirection = directionOf(guard: map[position.y][position.x])
         while withinMapBounds(position: position) {
             let `guard` = map[position.y][position.x]
             let direction = directionOf(guard: `guard`)
@@ -80,34 +86,54 @@ func traverse(map freshMap: [[String]]) -> Traversal {
             if map[newPosition.y][newPosition.x] == "#" {
                 // obstacle: rotate
                 map[position.y][position.x] = rotated(guard: map[position.y][position.x])
+
+                let direction = directionOf(guard: map[position.y][position.x])
+                print("\(position) vs \(startPosition!), \(direction) vs \(startDirection)")
+                if (position == startPosition && direction == startDirection) {
+                    print("loop")
+                    return Traversal(exited: false, map: map, visited: visited)
+                }
+
             }
             else {
-                print(map[newPosition.y][newPosition.x])
-                if map[newPosition.y][newPosition.x] == "X" {
-                    crossings.append(newPosition)
-                }
                 map[position.y][position.x] = "X"
                 map[newPosition.y][newPosition.x] = `guard`
                 position = newPosition
+                visited.append(newPosition)
             }
+
         }
         map[position.y][position.x] = "X"
+        return Traversal(exited: true, map: map, visited: visited)
     }
-    return Traversal(exited: true, map: map, crossings: crossings)
+    return nil
 }
 
 let map = input.split(separator: "\n").map({ line in line.split(separator: "").map({ String($0) }) })
-let traversal = traverse(map: map)
-print(traversal.exited)
-print(map: traversal.map)
-print(traversal.crossings)
+if let traversal = traverse(map: map) {
+    print(map: traversal.map)
 
-var countVisited = 0
-for line in traversal.map {
-    for position in line {
-        if position == "X" {
-            countVisited += 1
+    var countVisited = 0
+    for line in traversal.map {
+        for position in line {
+            if position == "X" {
+                countVisited += 1
+            }
+        }
+    }
+    print("Total number of places visited: \(countVisited)") 
+
+    for position in traversal.visited {
+        var adjustedMap = input.split(separator: "\n").map({ line in line.split(separator: "").map({ String($0) }) })
+        adjustedMap[position.y][position.x] = "#"
+        print()
+        print(map: adjustedMap)
+        if let adjustedTraversal = traverse(map: adjustedMap) {
+            print("=")
+            print(map: adjustedTraversal.map)
         }
     }
 }
-print("Total number of places visited: \(countVisited)") 
+else {
+    print("No solution for map")
+}

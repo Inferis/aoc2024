@@ -10,33 +10,72 @@ guard let input = try? String(contentsOf:URL(filePath: file), encoding: .utf8) e
 }
 
 var stones = input.split(separator: " ").map({ Int(String($0))! })
-let blinks = 75
 
-for b in 1...blinks {
-    print(b, stones.count)
-    var newStones: [Int] = []
-    for s in 0..<stones.count {
-        if stones[s] == 0 {
-            newStones.append(1)
-        }
-        else {
-            var x = stones[s]
-            var exp = 0
-            while x > 0 {
-                x = x / 10
-                exp += 1
+func blink(stones: [Int], concurrent: Bool) -> [Int] {
+    if concurrent {
+        var newStones: [Int] = []
+        let group = DispatchGroup()
+        let lock = NSLock()
+        for s in stones {
+            group.enter()
+            DispatchQueue.global(qos: .userInitiated).async {
+                if s == 0 {
+                    lock.lock()
+                    newStones.append(1)
+                    lock.unlock()
+                }
+                else {
+                    var digits = Int(floor(log10(Double(s))))+1
+                    if digits.isMultiple(of: 2) {
+                        digits = Int(pow(10.0, Double(digits / 2)))
+                        let left = s / digits
+                        let right = s % digits
+                        lock.lock()
+                        newStones.append(left)
+                        newStones.append(right)
+                        lock.unlock()
+                    }
+                    else {
+                        lock.lock()
+                        newStones.append(s * 2024)
+                        lock.unlock()
+                    }
+                }
+                group.leave()
             }
-
-            if exp > 0 && exp.isMultiple(of: 2) {
-                exp = Int(pow(10.0, Double(exp / 2)))
-                newStones.append(stones[s] / exp)
-                newStones.append(stones[s] % exp)
+        }
+        group.wait()
+        return newStones
+    }
+    else {
+        return stones.flatMap({ s in 
+            if s == 0 {
+                return [1]
             }
             else {
-                newStones.append(stones[s] * 2024)
+                var digits = Int(floor(log10(Double(s))))+1
+                if digits.isMultiple(of: 2) {
+                    digits = Int(pow(10.0, Double(digits / 2)))
+                    let left = s / digits
+                    let right = s % digits
+                    return [left, right]
+                }
+                else {
+                    return [s * 2024]
+                }
             }
-        }
+        })
     }
-    stones = newStones
 }
-print("Total number of stones for \(blinks) blinks: \(stones.count)")
+
+for b in 1...25 {
+    print(b, stones.count)
+    stones = blink(stones: stones, concurrent: true)
+}
+print("Total number of stones for 25 blinks: \(stones.count)")
+
+for b in 1...50 {
+    print(25+b, stones.count)
+    stones = blink(stones: stones, concurrent: true)
+}
+print("Total number of stones for 75 blinks: \(stones.count)")
